@@ -1,0 +1,8 @@
+ir_datasets
+numpy
+scipy
+scikit-learn
+matplotlib
+streamlit
+joblib
+pandas

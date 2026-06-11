@@ -1,0 +1,8 @@
+{
+  "dataset_id": "local-msmarco-passage",
+  "max_docs": 250000,
+  "actual_docs": 253947,
+  "queries": 43,
+  "qrels_queries": 43,
+  "db_path": "C:\\Users\\Lenovo\\Desktop\\ir dociment\\ir_project\\artifacts\\documents.sqlite"
+}

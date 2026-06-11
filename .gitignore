@@ -1,0 +1,14 @@
+.codex_deps/
+.tmp/
+__pycache__/
+*.pyc
+*.log
+.streamlit/
+IR Project 2026.pdf
+محادثة الشات جي بي تي.docx
+ملاحظات-تنفيذ-المشروع.txt
+data/raw/msmarco/*
+!data/raw/msmarco/.gitkeep
+data/raw/ir_datasets/
+artifacts/*.joblib
+artifacts/*.sqlite
