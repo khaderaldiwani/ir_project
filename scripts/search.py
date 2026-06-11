@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT / "src"))
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
-from ir_project.config import ARTIFACTS_DIR
+from ir_project.config import ARTIFACTS_DIR, resolve_artifact_path
 from ir_project.services.database import DocumentStore
 from ir_project.services.indexing_service import load_index
 from ir_project.services.retrieval_service import RetrievalService
@@ -31,7 +31,7 @@ def main() -> None:
     args = parser.parse_args()
 
     metadata = json.loads((ARTIFACTS_DIR / "dataset_metadata.json").read_text(encoding="utf-8"))
-    store = DocumentStore(Path(metadata["db_path"]))
+    store = DocumentStore(resolve_artifact_path(metadata["db_path"], "documents.sqlite"))
     retriever = RetrievalService(load_index())
     results = retriever.search(args.query, args.method, top_k=args.top_k, k1=args.k1, b=args.b)
     docs = store.get_many([result.doc_id for result in results])

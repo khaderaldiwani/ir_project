@@ -25,3 +25,18 @@ os.environ.setdefault("MPLCONFIGDIR", str(TMP_DIR / "matplotlib"))
 def ensure_dirs() -> None:
     for path in [RAW_DIR, PROCESSED_DIR, ARTIFACTS_DIR, REPORTS_DIR, FIGURES_DIR, TMP_DIR]:
         path.mkdir(parents=True, exist_ok=True)
+
+
+def resolve_artifact_path(saved_path: str | Path, fallback_name: str) -> Path:
+    path = Path(saved_path)
+    raw_path = str(saved_path).replace("\\", "/")
+    if raw_path.startswith("/content/") or raw_path.startswith("content/"):
+        fallback = ARTIFACTS_DIR / fallback_name
+        if fallback.exists():
+            return fallback
+    if path.exists():
+        return path
+    fallback = ARTIFACTS_DIR / fallback_name
+    if fallback.exists():
+        return fallback
+    return path

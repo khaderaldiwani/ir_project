@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT / "src"))
 import streamlit as st
 import pandas as pd
 
-from ir_project.config import ARTIFACTS_DIR
+from ir_project.config import ARTIFACTS_DIR, resolve_artifact_path
 from ir_project.services.database import DocumentStore
 from ir_project.services.indexing_service import load_index
 from ir_project.services.rag_service import RagService
@@ -31,7 +31,7 @@ def load_services():
         return None, None, None
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     index = load_index()
-    store = DocumentStore(Path(metadata["db_path"]))
+    store = DocumentStore(resolve_artifact_path(metadata["db_path"], "documents.sqlite"))
     retriever = RetrievalService(index)
     rag = RagService(retriever, store)
     return metadata, retriever, rag

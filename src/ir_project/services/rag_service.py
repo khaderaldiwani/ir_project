@@ -37,7 +37,11 @@ class RagService:
             snippets.append(f"[{result.rank}] {snippet}")
 
         if not snippets:
-            return RagAnswer("No relevant documents were found for this question.", sources)
+            return RagAnswer(
+                "Documents were retrieved, but their original text was not found in the local document store. "
+                "Check that artifacts/documents.sqlite exists next to search_index.joblib.",
+                sources,
+            )
 
         answer = (
             "Based on the retrieved documents, the strongest evidence is summarized below:\n\n"
