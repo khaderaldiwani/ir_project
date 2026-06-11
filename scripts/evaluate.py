@@ -32,6 +32,7 @@ def main() -> None:
     parser.add_argument("--queries-path", default="data/raw/msmarco/queries.tsv")
     parser.add_argument("--qrels-path", default="data/raw/msmarco/qrels.txt")
     parser.add_argument("--max-queries", type=int, default=DEFAULT_MAX_QUERIES)
+    parser.add_argument("--refine", action="store_true", help="Evaluate after query refinement.")
     args = parser.parse_args()
 
     ensure_dirs()
@@ -51,16 +52,19 @@ def main() -> None:
     else:
         prepared = prepare_dataset(args.dataset, max_docs=max_docs, max_queries=args.max_queries)
     retriever = RetrievalService(load_index())
-    rows = evaluate(retriever, prepared.queries, prepared.qrels)
+    rows = evaluate(retriever, prepared.queries, prepared.qrels, refine=args.refine)
 
-    csv_path = ARTIFACTS_DIR / "evaluation_metrics.csv"
+    csv_path = ARTIFACTS_DIR / ("evaluation_metrics_refined.csv" if args.refine else "evaluation_metrics.csv")
     with csv_path.open("w", newline="", encoding="utf-8") as file:
         writer = csv.DictWriter(file, fieldnames=["method", "map", "ndcg", "precision_at_10", "recall"])
         writer.writeheader()
         for row in rows:
             writer.writerow(row.__dict__)
             print(row)
-    chart_path = save_metrics_chart(rows)
+    chart_path = save_metrics_chart(
+        rows,
+        output_path=(ARTIFACTS_DIR.parent / "reports" / "figures" / ("evaluation_metrics_refined.png" if args.refine else "evaluation_metrics.png")),
+    )
     print(f"Saved metrics to {csv_path}")
     print(f"Saved chart to {chart_path}")
 

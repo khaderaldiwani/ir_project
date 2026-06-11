@@ -28,12 +28,13 @@ def main() -> None:
     parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument("--k1", type=float, default=1.5)
     parser.add_argument("--b", type=float, default=0.75)
+    parser.add_argument("--refine", action="store_true")
     args = parser.parse_args()
 
     metadata = json.loads((ARTIFACTS_DIR / "dataset_metadata.json").read_text(encoding="utf-8"))
     store = DocumentStore(resolve_artifact_path(metadata["db_path"], "documents.sqlite"))
     retriever = RetrievalService(load_index())
-    results = retriever.search(args.query, args.method, top_k=args.top_k, k1=args.k1, b=args.b)
+    results = retriever.search(args.query, args.method, top_k=args.top_k, k1=args.k1, b=args.b, refine=args.refine)
     docs = store.get_many([result.doc_id for result in results])
     for result in results:
         doc = docs.get(result.doc_id, {})

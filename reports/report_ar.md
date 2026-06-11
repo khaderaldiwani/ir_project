@@ -2,7 +2,9 @@
 
 ## 1. فكرة المشروع
 
-المشروع عبارة عن نظام استرجاع معلومات Information Retrieval System. يقوم المستخدم بإدخال استعلام نصي، ثم يعيد النظام أفضل 10 وثائق مرتبطة بالاستعلام من مجموعة بيانات كبيرة. تم تنفيذ المشروع بلغة Python مع واجهة بسيطة وتجهيز تقييم رسمي باستخدام qrels.
+المشروع هو نظام استرجاع معلومات Information Retrieval System. يقوم المستخدم بإدخال استعلام نصي، ثم يعيد النظام أفضل الوثائق المرتبطة بالاستعلام من مجموعة بيانات كبيرة. تم تنفيذ المشروع بلغة Python، وتجهيز واجهة Streamlit، وتقييم النظام باستخدام qrels ومقاييس IR القياسية.
+
+الهدف العملي من النظام هو محاكاة محرك بحث صغير: يأخذ query، يعالجها، يطابقها مع الوثائق، يرتب النتائج، ثم يعرض الوثائق الأصلية للمستخدم.
 
 ## 2. Dataset
 
@@ -11,15 +13,17 @@
 - ليست Antique dataset.
 - تحتوي على أكثر من 200K وثيقة.
 - تحتوي على queries.
-- تحتوي على qrels، وهذا ضروري لحساب MAP و nDCG.
+- تحتوي على qrels، وهذا ضروري لحساب MAP و nDCG و Precision@10 و Recall.
 
 النسخة المحضرة في المشروع تحتوي على:
 
 - عدد الوثائق: 253,947
-- عدد الاستعلامات ذات qrels: 43
+- Dataset: `local-msmarco-passage`
 - مصدر الوثائق المحلي: `data/raw/msmarco/collection.tsv`
 - مصدر الاستعلامات: `data/raw/msmarco/queries.tsv`
 - مصدر qrels: `data/raw/msmarco/qrels.txt`
+
+تم التدريب وبناء الفهارس على Google Colab، ثم تم حفظ الملفات الناتجة داخل مجلد `artifacts` ونقلها إلى المشروع المحلي. وقت العرض لا يتم تدريب جديد، بل يقرأ النظام الملفات الجاهزة مثل `search_index.joblib` و `documents.sqlite`.
 
 ## 3. المعالجة المسبقة
 
@@ -32,13 +36,30 @@
 
 نستخدم نفس المعالجة للوثائق والاستعلامات لضمان التوافق بين تمثيل query وتمثيل documents.
 
-## 4. بنية النظام وفق SOA
+## 4. Query Processing و Query Refinement
 
-تم تقسيم المشروع إلى خدمات مستقلة:
+تم تنفيذ Query Processing باستخدام نفس خطوات تنظيف الوثائق، ثم تمثيل الاستعلام بالطريقة المناسبة لكل نموذج: TF-IDF أو BM25 أو Embedding.
+
+كما تمت إضافة Query Refinement قابل للتفعيل من الواجهة. هذه الخدمة تقوم بـ:
+
+- تصحيح بعض الأخطاء الإملائية الشائعة مثل `diabetis` إلى `diabetes`.
+- توسعة الاستعلام بمرادفات بسيطة مثل:
+  - `treatment` إلى `therapy`, `medication`, `medicine`
+  - `symptoms` إلى `signs`, `indications`
+  - `diabetes` إلى `diabetic`, `glucose`, `insulin`
+
+ويوجد خيار في الواجهة باسم `Query refinement` لتفعيل أو إيقاف هذه الميزة وتجربتها بشكل مستقل.
+
+## 5. بنية النظام وفق SOA
+
+تم تقسيم المشروع إلى خدمات Python مستقلة ومنظمة وفق مفهوم SOA. لم يتم استخدام Microservices أو REST API حقيقية لتقليل التعقيد وضمان سرعة العرض، لكن تم تحقيق فصل واضح للمسؤوليات وقابلية تشغيل الخدمات بشكل مستقل من خلال سكربتات Python.
+
+الخدمات الأساسية:
 
 - Data Service: تحميل وتجهيز Dataset.
 - Document Store Service: تخزين الوثائق الأصلية في SQLite.
 - Preprocessing Service: تنظيف النصوص.
+- Query Refinement Service: تحسين الاستعلامات.
 - Indexing Service: بناء فهارس TF-IDF وBM25 وEmbedding.
 - Retrieval Service: تنفيذ البحث والترتيب.
 - Evaluation Service: حساب MAP وnDCG وPrecision@10 وRecall.
@@ -54,7 +75,9 @@ flowchart LR
     E --> F["TF-IDF"]
     E --> G["BM25"]
     E --> H["Embedding"]
-    F --> I["Retrieval"]
+    D --> Q["Query Refinement"]
+    Q --> I["Retrieval"]
+    F --> I
     G --> I
     H --> I
     I --> J["Evaluation"]
@@ -64,23 +87,32 @@ flowchart LR
     I --> L
 ```
 
-## 5. نماذج الاسترجاع
+## 6. نماذج الاسترجاع
 
 تم تنفيذ الطرق التالية:
 
 - TF-IDF: تمثيل Vector Space Model وحساب cosine similarity.
-- BM25: نموذج احتمالي مع إمكانية التحكم بالمعاملات k1 و b.
+- BM25: نموذج احتمالي مع إمكانية التحكم بالمعاملات k1 و b من الواجهة.
 - Embedding: تمثيل latent semantic embedding باستخدام TF-IDF مع TruncatedSVD.
 - Hybrid Parallel: دمج نتائج TF-IDF وBM25 وEmbedding باستخدام weighted score fusion.
 - Hybrid Serial: استخدام BM25 لاسترجاع المرشحين ثم إعادة ترتيبهم باستخدام embedding.
 
-## 6. الميزة الإضافية
+تم استخدام LSA / TruncatedSVD بدل BERT لأن المشروع يحتاج سرعة عالية أثناء المقابلة، ولا يجب أن يعتمد على تحميل نموذج كبير أو GPU أو إنترنت. هذا يجعل النظام قابلاً للتشغيل محلياً بسرعة، مع بقاء الفكرة ضمن تمثيل Embedding دلالي خفيف.
 
-لأن عدد أعضاء الفريق 5، المطلوب ميزة إضافية واحدة. تم اختيار RAG-style chat.
+## 7. الميزة الإضافية
 
-الواجهة تسمح بكتابة سؤال، ثم يسترجع النظام الوثائق الأكثر صلة، ويعرض إجابة extractive مبنية على النصوص المسترجعة مع مصادرها. هذه الميزة قابلة للتجربة بشكل مستقل من تبويب RAG Chat في الواجهة.
+لأن عدد أعضاء الفريق 5، المطلوب ميزة إضافية واحدة. تم اختيار RAG-style Chat.
 
-## 7. التقييم
+تعمل الميزة بالشكل التالي:
+
+1. يكتب المستخدم سؤالاً في تبويب RAG Chat.
+2. يستخدم النظام Retrieval Service لجلب الوثائق الأكثر صلة.
+3. يتم بناء جواب extractive grounded answer من المقاطع المسترجعة.
+4. يتم عرض مصادر الإجابة مع `doc_id` وscore.
+
+الميزة قابلة للتجربة بشكل مستقل من تبويب RAG Chat.
+
+## 8. التقييم
 
 تم حساب المقاييس التالية:
 
@@ -89,45 +121,96 @@ flowchart LR
 - Precision@10
 - Recall
 
-نتائج التقييم الحالية:
+نتائج التقييم الظاهرة في الواجهة بعد تدريب Colab:
 
 | Method | MAP | nDCG@10 | Precision@10 | Recall |
 |---|---:|---:|---:|---:|
-| TF-IDF | 0.1587 | 0.4781 | 0.8047 | 0.1688 |
-| BM25 | 0.2007 | 0.5609 | 0.9023 | 0.2028 |
-| Embedding | 0.0137 | 0.0861 | 0.1767 | 0.0182 |
-| Hybrid Parallel | 0.1816 | 0.5434 | 0.8698 | 0.1881 |
-| Hybrid Serial | 0.1800 | 0.5405 | 0.8419 | 0.1862 |
+| TF-IDF | 0.1308 | 0.5339 | 0.8600 | 0.1411 |
+| BM25 | 0.1476 | 0.5627 | 0.9000 | 0.1505 |
+| Embedding | 0.0157 | 0.0737 | 0.1650 | 0.0226 |
+| Hybrid Parallel | 0.1445 | 0.5500 | 0.8850 | 0.1475 |
+| Hybrid Serial | 0.1390 | 0.5307 | 0.8350 | 0.1429 |
 
-أفضل نموذج في هذه التجربة هو BM25، ويظهر ذلك خصوصاً في Precision@10 وMAP. نتائج Embedding وحده أقل لأن تمثيل LSA المستخدم خفيف وسريع ومبني على corpus محلي، بينما BM25 مناسب جداً لطبيعة MS MARCO passage retrieval.
+أفضل نموذج في هذه التجربة هو BM25، خصوصاً في Precision@10 و nDCG@10. هذا منطقي لأن MS MARCO Passage يعتمد كثيراً على مطابقة المصطلحات، وBM25 مناسب جداً لهذا النوع من البيانات.
 
-الرسم البياني موجود في:
+تم أيضاً توليد تقييم إضافي بعد تفعيل Query Refinement في:
 
-`reports/figures/evaluation_metrics.png`
+- `artifacts/evaluation_metrics_refined.csv`
+- `reports/figures/evaluation_metrics_refined.png`
 
-## 8. الواجهة
+بالنسبة إلى RAG، فهو لا يغيّر qrels مباشرة لأنه طبقة إجابة فوق الاسترجاع، لذلك تم تقييم نماذج الاسترجاع الأساسية رقمياً، وتم تقييم RAG عملياً من خلال الواجهة وعرض المصادر.
+
+## 9. لقطات من النظام
+
+### Search Results
+
+![Search Results](screenshots/search_results.png)
+
+### RAG Answer
+
+![RAG Answer](screenshots/rag_answer.png)
+
+### RAG Sources
+
+![RAG Sources](screenshots/rag_sources.png)
+
+### Evaluation Table
+
+![Evaluation Table](screenshots/evaluation_table.png)
+
+### Evaluation Chart
+
+![Evaluation Chart](screenshots/evaluation_chart.png)
+
+## 10. الواجهة
 
 تم بناء واجهة Streamlit تحتوي على:
 
 - اختيار طريقة البحث.
 - التحكم بمعاملات BM25.
+- تفعيل أو إيقاف Query Refinement.
 - عرض أفضل 10 وثائق أصلية من SQLite.
 - تبويب RAG Chat.
 - تبويب Evaluation لعرض النتائج والرسم البياني.
 
-## 9. تقسيم العمل بين خمسة أعضاء
+## 11. تقسيم العمل بين أعضاء الفريق
 
-- العضو الأول: Dataset وتجهيز qrels والوثائق.
-- العضو الثاني: Preprocessing وTF-IDF.
-- العضو الثالث: BM25 وHybrid Retrieval.
-- العضو الرابع: Evaluation والرسوم البيانية.
-- العضو الخامس: UI وRAG Chat وREADME.
+- الخضر الديواني: تجهيز Dataset، إدارة qrels، وتحضير ملفات التدريب على Colab.
+- نايا سعدون: Preprocessing و Query Processing و Query Refinement.
+- حلا العوض: TF-IDF و Embedding وتمثيل الوثائق.
+- ليث ضاهر: BM25 و Hybrid Retrieval و Ranking.
+- نوال صالح: Evaluation و Streamlit UI و RAG Chat وكتابة التقرير.
 
-## 10. طريقة التشغيل
+## 12. طريقة التشغيل
+
+وقت العرض لا نعيد التدريب. نشغل الواجهة فقط:
+
+```powershell
+cd "C:\Users\Lenovo\Desktop\ir dociment\ir_project"
+.\run_app.ps1
+```
+
+ثم نفتح:
+
+```text
+http://localhost:8501
+```
+
+إذا أردنا إعادة بناء الفهارس من الصفر:
 
 ```powershell
 $env:PYTHONPATH=".codex_deps;src"
 python scripts\prepare.py --local-msmarco --max-docs 250000 --max-queries 43 --embedding-dims 128
 python scripts\evaluate.py --local-msmarco --max-queries 43
-.\run_app.ps1
 ```
+
+## 13. GitHub
+
+تم تجهيز المشروع للرفع على GitHub مع تجاهل الملفات الضخمة مثل:
+
+- `data/raw/msmarco/collection.tsv`
+- `artifacts/search_index.joblib`
+- `artifacts/documents.sqlite`
+- `.codex_deps`
+
+الـ README يشرح طريقة تنزيل Dataset وتوليد الملفات الكبيرة محلياً أو على Colab.

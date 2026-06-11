@@ -15,8 +15,8 @@ class RagService:
         self.retriever = retriever
         self.store = store
 
-    def answer(self, question: str, method: str = "hybrid_parallel", top_k: int = 5) -> RagAnswer:
-        results = self.retriever.search(question, method=method, top_k=top_k)
+    def answer(self, question: str, method: str = "hybrid_parallel", top_k: int = 5, refine: bool = False) -> RagAnswer:
+        results = self.retriever.search(question, method=method, top_k=top_k, refine=refine)
         documents = self.store.get_many([result.doc_id for result in results])
         sources = []
         snippets = []

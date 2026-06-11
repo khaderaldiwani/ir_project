@@ -5,6 +5,7 @@ from sklearn.preprocessing import normalize
 
 from ir_project.config import TOP_K
 from ir_project.services.indexing_service import SearchIndex
+from ir_project.services.query_refinement import QueryRefinementService
 
 
 @dataclass
@@ -19,6 +20,7 @@ class RetrievalService:
     def __init__(self, index: SearchIndex):
         self.index = index
         self.doc_pos = {doc_id: pos for pos, doc_id in enumerate(index.doc_ids)}
+        self.refiner = QueryRefinementService(index.processor)
 
     def _clean_query(self, query: str) -> str:
         return self.index.processor.normalize(query)
@@ -59,7 +61,16 @@ class RetrievalService:
             scores[result.doc_id] = float(self.index.embedding_matrix[pos] @ query_embedding) + 0.15 * result.score
         return self._rank_map(scores, top_k, "Hybrid-Serial")
 
-    def search(self, query: str, method: str, top_k: int = TOP_K, k1: float = 1.5, b: float = 0.75) -> list[SearchResult]:
+    def search(
+        self,
+        query: str,
+        method: str,
+        top_k: int = TOP_K,
+        k1: float = 1.5,
+        b: float = 0.75,
+        refine: bool = False,
+    ) -> list[SearchResult]:
+        query = self.refiner.refine(query) if refine else query
         methods = {
             "tfidf": lambda: self.tfidf_search(query, top_k),
             "bm25": lambda: self.bm25_search(query, top_k, k1=k1, b=b),

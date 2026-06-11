@@ -22,6 +22,7 @@ MS MARCO was selected because it is not Antique, contains more than 200K documen
 - TF-IDF retrieval
 - BM25 retrieval with configurable `k1` and `b`
 - Latent semantic embedding retrieval using TF-IDF + TruncatedSVD
+- Query refinement with lightweight spelling correction and synonym expansion
 - Hybrid parallel retrieval with score fusion
 - Hybrid serial retrieval with BM25 candidate generation and embedding reranking
 - RAG-style chat interface with grounded source passages
@@ -99,3 +100,15 @@ The latest results are saved in `artifacts/evaluation_metrics.csv`, and the char
 
 Best current baseline: BM25.
 
+Additional refined-query evaluation:
+
+- `artifacts/evaluation_metrics_refined.csv`
+- `reports/figures/evaluation_metrics_refined.png`
+
+## Team
+
+- الخضر الديواني
+- نايا سعدون
+- حلا العوض
+- ليث ضاهر
+- نوال صالح

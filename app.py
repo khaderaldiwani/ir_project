@@ -62,13 +62,14 @@ with st.sidebar:
     top_k = st.slider("Top K", min_value=5, max_value=20, value=10)
     k1 = st.slider("BM25 k1", min_value=0.2, max_value=3.0, value=1.5, step=0.1)
     b = st.slider("BM25 b", min_value=0.0, max_value=1.0, value=0.75, step=0.05)
+    use_refinement = st.checkbox("Query refinement", value=True)
 
 search_tab, rag_tab, metrics_tab = st.tabs(["Search", "RAG Chat", "Evaluation"])
 
 with search_tab:
     query = st.text_input("Search query", value="what is the treatment for coronavirus")
     if st.button("Search", type="primary"):
-        results = retriever.search(query, method=method, top_k=top_k, k1=k1, b=b)
+        results = retriever.search(query, method=method, top_k=top_k, k1=k1, b=b, refine=use_refinement)
         docs = rag.store.get_many([result.doc_id for result in results])
         for result in results:
             doc = docs.get(result.doc_id, {})
@@ -79,7 +80,7 @@ with search_tab:
 with rag_tab:
     question = st.text_input("Ask a question", value="Which passages discuss symptoms and treatment?")
     if st.button("Generate grounded answer"):
-        answer = rag.answer(question, method=method, top_k=min(top_k, 8))
+        answer = rag.answer(question, method=method, top_k=min(top_k, 8), refine=use_refinement)
         st.markdown(answer.answer)
         st.subheader("Sources")
         for source in answer.sources:

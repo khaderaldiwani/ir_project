@@ -64,6 +64,7 @@ def evaluate(
     qrels: dict[str, dict[str, int]],
     methods: list[str] | None = None,
     top_k: int = TOP_K,
+    refine: bool = False,
 ) -> list[MetricRow]:
     methods = methods or ["tfidf", "bm25", "embedding", "hybrid_parallel", "hybrid_serial"]
     rows: list[MetricRow] = []
@@ -76,7 +77,7 @@ def evaluate(
             relevant = qrels.get(query_id, {})
             if not relevant:
                 continue
-            results = retriever.search(query_text, method=method, top_k=top_k)
+            results = retriever.search(query_text, method=method, top_k=top_k, refine=refine)
             ap_values.append(average_precision(results, relevant))
             ndcg_values.append(ndcg_at_k(results, relevant, k=top_k))
             p10_values.append(precision_at_k(results, relevant, k=top_k))
