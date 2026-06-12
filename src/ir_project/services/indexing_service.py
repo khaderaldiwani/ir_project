@@ -21,7 +21,7 @@ class SearchIndex:
     tfidf_matrix: sparse.csr_matrix
     svd_model: TruncatedSVD
     embedding_matrix: np.ndarray
-    bm25: BM25Index
+    bm25: SparseBM25Index
     processor: TextProcessor
 
 
