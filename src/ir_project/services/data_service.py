@@ -91,7 +91,10 @@ def prepare_dataset(
 
     docs_store = dataset.docs_store()
     if relevant_doc_ids:
-        for doc in docs_store.get_many(list(relevant_doc_ids)):
+        relevant_docs = docs_store.get_many(list(relevant_doc_ids))
+        if isinstance(relevant_docs, dict):
+            relevant_docs = relevant_docs.values()
+        for doc in relevant_docs:
             doc_id, title, body = _doc_text(doc)
             if doc_id not in seen:
                 seen.add(doc_id)
