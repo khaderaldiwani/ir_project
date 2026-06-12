@@ -68,7 +68,7 @@ with st.sidebar:
 search_tab, rag_tab, metrics_tab = st.tabs(["Search", "RAG Chat", "Evaluation"])
 
 with search_tab:
-    query = st.text_input("Search query", value="what is the treatment for coronavirus")
+    query = st.text_input("Search query", value="lung cancer EGFR adult")
     if st.button("Search", type="primary"):
         try:
             results = retriever.search(query, method=method, top_k=top_k, k1=k1, b=b, refine=use_refinement)
@@ -82,7 +82,7 @@ with search_tab:
             st.error(str(exc))
 
 with rag_tab:
-    question = st.text_input("Ask a question", value="Which passages discuss symptoms and treatment?")
+    question = st.text_input("Ask a question", value="Which clinical trials discuss lung cancer and EGFR?")
     if st.button("Generate grounded answer"):
         try:
             answer = rag.answer(question, method=method, top_k=min(top_k, 8), refine=use_refinement)

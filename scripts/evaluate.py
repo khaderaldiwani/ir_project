@@ -31,15 +31,16 @@ def main() -> None:
     parser.add_argument("--collection-path", default="data/raw/msmarco/collection.tsv")
     parser.add_argument("--queries-path", default="data/raw/msmarco/queries.tsv")
     parser.add_argument("--qrels-path", default="data/raw/msmarco/qrels.txt")
-    parser.add_argument("--max-queries", type=int, default=DEFAULT_MAX_QUERIES)
+    parser.add_argument("--max-queries", type=int, default=DEFAULT_MAX_QUERIES, help="0 means use all queries.")
     parser.add_argument("--refine", action="store_true", help="Evaluate after query refinement.")
     args = parser.parse_args()
 
     ensure_dirs()
     metadata_path = ARTIFACTS_DIR / "dataset_metadata.json"
-    max_docs = 250_000
+    max_docs = 0
     if metadata_path.exists():
-        max_docs = json.loads(metadata_path.read_text(encoding="utf-8")).get("actual_docs", max_docs)
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        max_docs = int(metadata.get("actual_docs", 0) or 0)
 
     if args.local_msmarco:
         prepared = prepare_local_msmarco(

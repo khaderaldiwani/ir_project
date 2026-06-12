@@ -11,9 +11,9 @@ REPORTS_DIR = ROOT_DIR / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"
 TMP_DIR = ROOT_DIR / ".tmp"
 
-DEFAULT_DATASET_ID = "msmarco-passage/trec-dl-2019/judged"
-DEFAULT_MAX_DOCS = 250_000
-DEFAULT_MAX_QUERIES = 50
+DEFAULT_DATASET_ID = "clinicaltrials/2017/trec-pm-2017"
+DEFAULT_MAX_DOCS = 0
+DEFAULT_MAX_QUERIES = 0
 TOP_K = 10
 
 os.environ.setdefault("IR_DATASETS_HOME", str(RAW_DIR / "ir_datasets"))

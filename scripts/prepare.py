@@ -27,8 +27,8 @@ def main() -> None:
     parser.add_argument("--collection-path", default="data/raw/msmarco/collection.tsv")
     parser.add_argument("--queries-path", default="data/raw/msmarco/queries.tsv")
     parser.add_argument("--qrels-path", default="data/raw/msmarco/qrels.txt")
-    parser.add_argument("--max-docs", type=int, default=DEFAULT_MAX_DOCS)
-    parser.add_argument("--max-queries", type=int, default=DEFAULT_MAX_QUERIES)
+    parser.add_argument("--max-docs", type=int, default=DEFAULT_MAX_DOCS, help="0 means use all documents.")
+    parser.add_argument("--max-queries", type=int, default=DEFAULT_MAX_QUERIES, help="0 means use all queries.")
     parser.add_argument("--embedding-dims", type=int, default=256)
     args = parser.parse_args()
 
@@ -42,12 +42,12 @@ def main() -> None:
             max_queries=args.max_queries,
         )
     else:
-        prepared = prepare_dataset(args.dataset, max_docs=args.max_docs, max_queries=args.max_queries)
+        prepared = prepare_dataset(args.dataset, max_docs=args.max_docs, max_queries=args.max_queries, reset_store=True)
     build_index(prepared.doc_ids, prepared.db_path, embedding_dims=args.embedding_dims)
 
     metadata = {
         "dataset_id": prepared.dataset_id,
-        "max_docs": args.max_docs,
+        "max_docs": "all" if args.max_docs <= 0 else args.max_docs,
         "actual_docs": len(prepared.doc_ids),
         "queries": len(prepared.queries),
         "qrels_queries": len(prepared.qrels),

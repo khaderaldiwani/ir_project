@@ -8,22 +8,25 @@
 
 ## 2. Dataset
 
-تم اختيار MS MARCO Passage / TREC-DL 2019 judged لأنها تحقق شروط المشروع:
+تم اختيار ClinicalTrials 2017 / TREC Precision Medicine 2017 لأنها تحقق شروط المشروع:
 
 - ليست Antique dataset.
 - تحتوي على أكثر من 200K وثيقة.
 - تحتوي على queries.
 - تحتوي على qrels، وهذا ضروري لحساب MAP و nDCG و Precision@10 و Recall.
+- يمكن استخدامها كاملة بدون تجزيء Dataset ضخمة.
 
 النسخة المحضرة في المشروع تحتوي على:
 
-- عدد الوثائق: 253,947
-- Dataset: `local-msmarco-passage`
-- مصدر الوثائق المحلي: `data/raw/msmarco/collection.tsv`
-- مصدر الاستعلامات: `data/raw/msmarco/queries.tsv`
-- مصدر qrels: `data/raw/msmarco/qrels.txt`
+- عدد الوثائق: 241,006
+- Dataset: `clinicaltrials/2017/trec-pm-2017`
+- عدد الاستعلامات: 30
+- عدد qrels: 13,019
+- مصدر البيانات: `ir_datasets`
 
 تم التدريب وبناء الفهارس على Google Colab، ثم تم حفظ الملفات الناتجة داخل مجلد `artifacts` ونقلها إلى المشروع المحلي. وقت العرض لا يتم تدريب جديد، بل يقرأ النظام الملفات الجاهزة مثل `search_index.joblib` و `documents.sqlite`.
+
+تم استخدام Dataset كاملة بدون أخذ أول N وثيقة فقط. هذا مهم لأن أخذ جزء من Dataset ضخمة مثل MS MARCO قد لا يكون مقبولاً حسب ملاحظات المعيدة.
 
 ## 3. المعالجة المسبقة
 
@@ -35,6 +38,17 @@
 - حذف الرموز والكلمات القصيرة جداً.
 
 نستخدم نفس المعالجة للوثائق والاستعلامات لضمان التوافق بين تمثيل query وتمثيل documents.
+
+عند بناء TF-IDF، يتم تمرير النص المنظف مسبقاً إلى `TfidfVectorizer` مع إيقاف tokenization الافتراضي داخله:
+
+- `tokenizer=str.split`
+- `preprocessor=None`
+- `token_pattern=None`
+- `lowercase=False`
+
+وبذلك لا يحدث تنظيف مزدوج داخل TF-IDF.
+
+بالنسبة إلى ClinicalTrials، تحتوي الوثيقة على عدة حقول مثل `title`, `condition`, `summary`, `detailed_description`, `eligibility`. لذلك يتم دمج كل الحقول النصية في نص واحد للفهرسة والبحث، مع حفظ النص الأصلي الكامل في قاعدة البيانات.
 
 ## 4. Query Processing و Query Refinement
 
@@ -98,7 +112,7 @@ flowchart LR
 - Hybrid Serial: استخدام BM25 لاسترجاع المرشحين ثم إعادة ترتيبهم باستخدام embedding.
 - BERT Rerank: استخدام BM25 لجلب أفضل المرشحين بسرعة، ثم استخدام Sentence-BERT لإعادة ترتيب المرشحين دلالياً.
 
-تم استخدام LSA / TruncatedSVD كتمثيل Embedding سريع ومحلي، وتمت إضافة BERT بطريقة reranking حتى لا نحسب BERT embeddings لكل 253,947 وثيقة. هذه الطريقة عملية لأن BM25 يجلب عدداً صغيراً من المرشحين، ثم BERT يعيد ترتيبهم دلالياً. لا نحتاج إعادة تدريب الفهارس لاستخدام BERT، وإنما نحتاج فقط تحميل نموذج `sentence-transformers/all-MiniLM-L6-v2`.
+تم استخدام LSA / TruncatedSVD كتمثيل Embedding سريع ومحلي، وتمت إضافة BERT بطريقة reranking حتى لا نحسب BERT embeddings لكل 241,006 وثيقة. هذه الطريقة عملية لأن BM25 يجلب عدداً صغيراً من المرشحين، ثم BERT يعيد ترتيبهم دلالياً. لا نحتاج إعادة تدريب الفهارس لاستخدام BERT، وإنما نحتاج فقط تحميل نموذج `sentence-transformers/all-MiniLM-L6-v2`.
 
 ## 7. الميزة الإضافية
 
@@ -122,17 +136,17 @@ flowchart LR
 - Precision@10
 - Recall
 
-نتائج التقييم الظاهرة في الواجهة بعد تدريب Colab:
+نتائج التقييم يتم توليدها بعد تدريب Colab على ClinicalTrials وتخزينها في `artifacts/evaluation_metrics.csv`. الجدول التالي يتم تحديثه حسب آخر تدريب:
 
 | Method | MAP | nDCG@10 | Precision@10 | Recall |
 |---|---:|---:|---:|---:|
-| TF-IDF | 0.1308 | 0.5339 | 0.8600 | 0.1411 |
-| BM25 | 0.1476 | 0.5627 | 0.9000 | 0.1505 |
-| Embedding | 0.0157 | 0.0737 | 0.1650 | 0.0226 |
-| Hybrid Parallel | 0.1445 | 0.5500 | 0.8850 | 0.1475 |
-| Hybrid Serial | 0.1390 | 0.5307 | 0.8350 | 0.1429 |
+| TF-IDF | يتم توليده | يتم توليده | يتم توليده | يتم توليده |
+| BM25 | يتم توليده | يتم توليده | يتم توليده | يتم توليده |
+| Embedding | يتم توليده | يتم توليده | يتم توليده | يتم توليده |
+| Hybrid Parallel | يتم توليده | يتم توليده | يتم توليده | يتم توليده |
+| Hybrid Serial | يتم توليده | يتم توليده | يتم توليده | يتم توليده |
 
-أفضل نموذج في هذه التجربة هو BM25، خصوصاً في Precision@10 و nDCG@10. هذا منطقي لأن MS MARCO Passage يعتمد كثيراً على مطابقة المصطلحات، وBM25 مناسب جداً لهذا النوع من البيانات.
+بعد إعادة التدريب على ClinicalTrials يتم اختيار أفضل نموذج حسب النتائج الفعلية. غالباً يكون BM25 أو Hybrid مناسبين لأن الاستعلامات الطبية تعتمد على مصطلحات محددة مثل disease وgene وdemographic.
 
 تم أيضاً توليد تقييم إضافي بعد تفعيل Query Refinement في:
 
@@ -204,8 +218,8 @@ http://localhost:8501
 
 ```powershell
 $env:PYTHONPATH=".codex_deps;src"
-python scripts\prepare.py --local-msmarco --max-docs 250000 --max-queries 43 --embedding-dims 128
-python scripts\evaluate.py --local-msmarco --max-queries 43
+python scripts\prepare.py --dataset clinicaltrials/2017/trec-pm-2017 --max-docs 0 --max-queries 0 --embedding-dims 128
+python scripts\evaluate.py --dataset clinicaltrials/2017/trec-pm-2017 --max-queries 0
 ```
 
 ## 13. GitHub

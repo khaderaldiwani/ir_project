@@ -4,16 +4,15 @@ Python project for the 2026 Information Retrieval practical assignment.
 
 ## Dataset
 
-The implementation uses MS MARCO Passage / TREC-DL 2019 judged data.
+The final implementation uses ClinicalTrials 2017 / TREC Precision Medicine 2017 data.
 
-- Local documents: `253,947`
-- Queries with qrels: `43`
+- Local documents: `241,006`
+- Queries with qrels: `30`
 - Dataset files:
-  - `data/raw/msmarco/collection.tsv`
-  - `data/raw/msmarco/queries.tsv`
-  - `data/raw/msmarco/qrels.txt`
+  - downloaded through `ir_datasets`
+  - dataset id: `clinicaltrials/2017/trec-pm-2017`
 
-MS MARCO was selected because it is not Antique, contains more than 200K documents, and provides qrels for formal evaluation.
+ClinicalTrials was selected because it is not Antique, contains more than 200K documents, provides qrels for formal evaluation, and can be processed as a complete dataset without taking only a sample.
 
 ## Features
 
@@ -65,28 +64,22 @@ This workspace already contains local dependencies in `.codex_deps`. To use them
 $env:PYTHONPATH=".codex_deps;src"
 ```
 
-Download official MS MARCO files:
-
-```powershell
-python scripts\download_msmarco.py
-```
-
 Build the final index:
 
 ```powershell
-python scripts\prepare.py --local-msmarco --max-docs 250000 --max-queries 43 --embedding-dims 128
+python scripts\prepare.py --dataset clinicaltrials/2017/trec-pm-2017 --max-docs 0 --max-queries 0 --embedding-dims 128
 ```
 
 Evaluate:
 
 ```powershell
-python scripts\evaluate.py --local-msmarco --max-queries 43
+python scripts\evaluate.py --dataset clinicaltrials/2017/trec-pm-2017 --max-queries 0
 ```
 
 Search from CLI:
 
 ```powershell
-python scripts\search.py "what are symptoms of coronavirus" --method bm25 --top-k 10
+python scripts\search.py "lung cancer EGFR adult" --method bm25 --top-k 10
 ```
 
 Run UI:

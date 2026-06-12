@@ -22,6 +22,10 @@ class DocumentStore:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_documents_doc_id ON documents(doc_id)")
         return conn
 
+    def reset(self) -> None:
+        with self.connect() as conn:
+            conn.execute("DELETE FROM documents")
+
     def upsert_many(self, rows: Iterable[tuple[str, str, str]]) -> None:
         with self.connect() as conn:
             conn.executemany(

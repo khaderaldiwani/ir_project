@@ -22,18 +22,38 @@ def _doc_text(doc) -> tuple[str, str, str]:
     doc_id = str(getattr(doc, "doc_id"))
     title = getattr(doc, "title", "") or ""
     parts = []
-    for field in ["text", "body", "abstract", "description"]:
-        value = getattr(doc, field, None)
-        if value:
-            parts.append(str(value))
+    fields = getattr(doc, "_fields", None)
+    if fields:
+        for field in fields:
+            if field == "doc_id":
+                continue
+            value = getattr(doc, field, None)
+            if value:
+                label = field.replace("_", " ").title()
+                parts.append(f"{label}: {_stringify(value)}")
+    else:
+        for field in ["title", "text", "body", "abstract", "description", "summary", "detailed_description", "condition", "eligibility"]:
+            value = getattr(doc, field, None)
+            if value:
+                parts.append(_stringify(value))
     body = "\n".join(parts) if parts else str(doc)
     return doc_id, title, body
 
 
 def _query_text(query) -> tuple[str, str]:
     query_id = str(getattr(query, "query_id"))
+    fields = getattr(query, "_fields", None)
+    if fields:
+        parts = []
+        for field in fields:
+            if field == "query_id":
+                continue
+            value = getattr(query, field, None)
+            if value:
+                parts.append(_stringify(value))
+        return query_id, " ".join(parts)
     text = getattr(query, "text", None) or getattr(query, "title", None) or str(query)
-    return query_id, str(text)
+    return query_id, _stringify(text)
 
 
 def prepare_dataset(
@@ -41,13 +61,16 @@ def prepare_dataset(
     max_docs: int = DEFAULT_MAX_DOCS,
     max_queries: int = DEFAULT_MAX_QUERIES,
     db_path: Path | None = None,
+    reset_store: bool = False,
 ) -> PreparedDataset:
     dataset = ir_datasets.load(dataset_id)
     db_path = db_path or ARTIFACTS_DIR / "documents.sqlite"
     store = DocumentStore(db_path)
+    if reset_store:
+        store.reset()
 
     queries = dict(_query_text(query) for query in dataset.queries_iter())
-    selected_query_ids = list(queries)[:max_queries]
+    selected_query_ids = list(queries) if max_queries <= 0 else list(queries)[:max_queries]
     queries = {qid: queries[qid] for qid in selected_query_ids}
 
     qrels: dict[str, dict[str, int]] = defaultdict(dict)
@@ -76,7 +99,7 @@ def prepare_dataset(
                 doc_rows.append((doc_id, title, body))
 
     for doc in dataset.docs_iter():
-        if len(doc_ids) >= max_docs:
+        if max_docs > 0 and len(doc_ids) >= max_docs:
             break
         doc_id, title, body = _doc_text(doc)
         if doc_id in seen:
@@ -98,6 +121,12 @@ def prepare_dataset(
         qrels=dict(qrels),
         db_path=db_path,
     )
+
+
+def _stringify(value) -> str:
+    if isinstance(value, (list, tuple, set)):
+        return " ".join(_stringify(item) for item in value if item)
+    return str(value)
 
 
 def prepare_local_msmarco(
