@@ -5,4 +5,5 @@ scikit-learn
 matplotlib
 streamlit
 joblib
+sentence-transformers
 pandas

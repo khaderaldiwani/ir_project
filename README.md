@@ -23,6 +23,7 @@ MS MARCO was selected because it is not Antique, contains more than 200K documen
 - BM25 retrieval with configurable `k1` and `b`
 - Latent semantic embedding retrieval using TF-IDF + TruncatedSVD
 - Query refinement with lightweight spelling correction and synonym expansion
+- BERT/Sentence-BERT reranking after BM25 candidate retrieval
 - Hybrid parallel retrieval with score fusion
 - Hybrid serial retrieval with BM25 candidate generation and embedding reranking
 - RAG-style chat interface with grounded source passages
@@ -93,6 +94,15 @@ Run UI:
 ```powershell
 .\run_app.ps1
 ```
+
+Optional BERT reranking:
+
+```powershell
+python -m pip install sentence-transformers
+python scripts\search.py "what is diabetes treatment" --method bert_rerank --top-k 5
+```
+
+BERT reranking does not rebuild `search_index.joblib` or `documents.sqlite`. BM25 retrieves candidates first, then Sentence-BERT reranks only those candidates.
 
 ## Current Evaluation
 

@@ -24,7 +24,7 @@ from ir_project.services.retrieval_service import RetrievalService
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run a search query from the command line.")
     parser.add_argument("query")
-    parser.add_argument("--method", default="hybrid_parallel", choices=["tfidf", "bm25", "embedding", "hybrid_parallel", "hybrid_serial"])
+    parser.add_argument("--method", default="hybrid_parallel", choices=["tfidf", "bm25", "embedding", "hybrid_parallel", "hybrid_serial", "bert_rerank"])
     parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument("--k1", type=float, default=1.5)
     parser.add_argument("--b", type=float, default=0.75)
@@ -33,8 +33,12 @@ def main() -> None:
 
     metadata = json.loads((ARTIFACTS_DIR / "dataset_metadata.json").read_text(encoding="utf-8"))
     store = DocumentStore(resolve_artifact_path(metadata["db_path"], "documents.sqlite"))
-    retriever = RetrievalService(load_index())
-    results = retriever.search(args.query, args.method, top_k=args.top_k, k1=args.k1, b=args.b, refine=args.refine)
+    retriever = RetrievalService(load_index(), store)
+    try:
+        results = retriever.search(args.query, args.method, top_k=args.top_k, k1=args.k1, b=args.b, refine=args.refine)
+    except RuntimeError as exc:
+        print(f"ERROR: {exc}")
+        raise SystemExit(1) from exc
     docs = store.get_many([result.doc_id for result in results])
     for result in results:
         doc = docs.get(result.doc_id, {})

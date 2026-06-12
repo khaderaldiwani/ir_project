@@ -12,3 +12,4 @@ data/raw/msmarco/*
 data/raw/ir_datasets/
 artifacts/*.joblib
 artifacts/*.sqlite
+artifacts/bert_model_cache/

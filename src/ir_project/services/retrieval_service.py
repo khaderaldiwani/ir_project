@@ -4,6 +4,7 @@ import numpy as np
 from sklearn.preprocessing import normalize
 
 from ir_project.config import TOP_K
+from ir_project.services.database import DocumentStore
 from ir_project.services.indexing_service import SearchIndex
 from ir_project.services.query_refinement import QueryRefinementService
 
@@ -17,8 +18,9 @@ class SearchResult:
 
 
 class RetrievalService:
-    def __init__(self, index: SearchIndex):
+    def __init__(self, index: SearchIndex, store: DocumentStore | None = None):
         self.index = index
+        self.store = store
         self.doc_pos = {doc_id: pos for pos, doc_id in enumerate(index.doc_ids)}
         self.refiner = QueryRefinementService(index.processor)
 
@@ -61,6 +63,15 @@ class RetrievalService:
             scores[result.doc_id] = float(self.index.embedding_matrix[pos] @ query_embedding) + 0.15 * result.score
         return self._rank_map(scores, top_k, "Hybrid-Serial")
 
+    def bert_rerank(self, query: str, top_k: int = TOP_K, candidate_k: int = 50, k1: float = 1.5, b: float = 0.75) -> list[SearchResult]:
+        if self.store is None:
+            raise RuntimeError("BERT reranking requires a DocumentStore.")
+        from ir_project.services.bert_reranker import BertReranker
+
+        candidates = self.bm25_search(query, top_k=candidate_k, k1=k1, b=b)
+        reranker = BertReranker(self.store)
+        return reranker.rerank(query, candidates, top_k=top_k)
+
     def search(
         self,
         query: str,
@@ -77,6 +88,7 @@ class RetrievalService:
             "embedding": lambda: self.embedding_search(query, top_k),
             "hybrid_parallel": lambda: self.hybrid_parallel(query, top_k),
             "hybrid_serial": lambda: self.hybrid_serial(query, top_k),
+            "bert_rerank": lambda: self.bert_rerank(query, top_k=top_k, k1=k1, b=b),
         }
         return methods[method]()
 

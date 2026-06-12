@@ -32,7 +32,7 @@ def load_services():
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     index = load_index()
     store = DocumentStore(resolve_artifact_path(metadata["db_path"], "documents.sqlite"))
-    retriever = RetrievalService(index)
+    retriever = RetrievalService(index, store)
     rag = RagService(retriever, store)
     return metadata, retriever, rag
 
@@ -57,6 +57,7 @@ with st.sidebar:
             "bm25",
             "tfidf",
             "embedding",
+            "bert_rerank",
         ],
     )
     top_k = st.slider("Top K", min_value=5, max_value=20, value=10)
@@ -69,23 +70,29 @@ search_tab, rag_tab, metrics_tab = st.tabs(["Search", "RAG Chat", "Evaluation"])
 with search_tab:
     query = st.text_input("Search query", value="what is the treatment for coronavirus")
     if st.button("Search", type="primary"):
-        results = retriever.search(query, method=method, top_k=top_k, k1=k1, b=b, refine=use_refinement)
-        docs = rag.store.get_many([result.doc_id for result in results])
-        for result in results:
-            doc = docs.get(result.doc_id, {})
-            st.markdown(f"#### {result.rank}. `{result.doc_id}`")
-            st.caption(f"{result.method} score: {result.score:.4f}")
-            st.write(" ".join(doc.get("body", "").split())[:1500])
+        try:
+            results = retriever.search(query, method=method, top_k=top_k, k1=k1, b=b, refine=use_refinement)
+            docs = rag.store.get_many([result.doc_id for result in results])
+            for result in results:
+                doc = docs.get(result.doc_id, {})
+                st.markdown(f"#### {result.rank}. `{result.doc_id}`")
+                st.caption(f"{result.method} score: {result.score:.4f}")
+                st.write(" ".join(doc.get("body", "").split())[:1500])
+        except RuntimeError as exc:
+            st.error(str(exc))
 
 with rag_tab:
     question = st.text_input("Ask a question", value="Which passages discuss symptoms and treatment?")
     if st.button("Generate grounded answer"):
-        answer = rag.answer(question, method=method, top_k=min(top_k, 8), refine=use_refinement)
-        st.markdown(answer.answer)
-        st.subheader("Sources")
-        for source in answer.sources:
-            st.markdown(f"**{source['rank']}. `{source['doc_id']}`** score `{source['score']}`")
-            st.write(source["snippet"])
+        try:
+            answer = rag.answer(question, method=method, top_k=min(top_k, 8), refine=use_refinement)
+            st.markdown(answer.answer)
+            st.subheader("Sources")
+            for source in answer.sources:
+                st.markdown(f"**{source['rank']}. `{source['doc_id']}`** score `{source['score']}`")
+                st.write(source["snippet"])
+        except RuntimeError as exc:
+            st.error(str(exc))
 
 with metrics_tab:
     metrics_path = ARTIFACTS_DIR / "evaluation_metrics.csv"
