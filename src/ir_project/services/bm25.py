@@ -2,6 +2,8 @@ import math
 from collections import Counter
 from dataclasses import dataclass
 
+import numpy as np
+
 
 @dataclass
 class BM25Index:
@@ -44,3 +46,40 @@ class BM25Index:
         ]
         scores.sort(key=lambda item: item[1], reverse=True)
         return [(doc_id, score) for doc_id, score in scores[:top_k] if score > 0]
+
+
+@dataclass
+class SparseBM25Index:
+    doc_ids: list[str]
+    count_vectorizer: object
+    count_matrix: object
+    doc_len: np.ndarray
+    avg_doc_len: float
+    idf: np.ndarray
+    k1: float = 1.5
+    b: float = 0.75
+
+    def search(self, query_tokens: list[str], top_k: int = 10, k1: float | None = None, b: float | None = None) -> list[tuple[str, float]]:
+        k1 = self.k1 if k1 is None else k1
+        b = self.b if b is None else b
+        query = " ".join(query_tokens)
+        query_vec = self.count_vectorizer.transform([query])
+        term_indices = query_vec.indices
+        if len(term_indices) == 0:
+            return []
+
+        scores = np.zeros(len(self.doc_ids), dtype=np.float32)
+        denom_norm = k1 * (1 - b + b * self.doc_len / max(self.avg_doc_len, 1e-9))
+
+        for term_index in term_indices:
+            col = self.count_matrix[:, term_index].tocoo()
+            if col.nnz == 0:
+                continue
+            tf = col.data.astype(np.float32)
+            partial = self.idf[term_index] * (tf * (k1 + 1.0) / (tf + denom_norm[col.row]))
+            scores[col.row] += partial
+
+        if not np.any(scores > 0):
+            return []
+        top_indices = np.argsort(scores)[::-1][:top_k]
+        return [(self.doc_ids[int(index)], float(scores[int(index)])) for index in top_indices if scores[int(index)] > 0]

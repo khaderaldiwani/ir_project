@@ -218,7 +218,7 @@ http://localhost:8501
 
 ```powershell
 $env:PYTHONPATH=".codex_deps;src"
-python scripts\prepare.py --dataset clinicaltrials/2017/trec-pm-2017 --max-docs 0 --max-queries 0 --embedding-dims 128
+python scripts\prepare.py --dataset clinicaltrials/2017/trec-pm-2017 --max-docs 0 --max-queries 0 --embedding-dims 64 --max-features 30000 --min-df 2 --max-df 0.95
 python scripts\evaluate.py --dataset clinicaltrials/2017/trec-pm-2017 --max-queries 0
 ```
 

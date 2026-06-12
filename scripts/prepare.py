@@ -30,6 +30,9 @@ def main() -> None:
     parser.add_argument("--max-docs", type=int, default=DEFAULT_MAX_DOCS, help="0 means use all documents.")
     parser.add_argument("--max-queries", type=int, default=DEFAULT_MAX_QUERIES, help="0 means use all queries.")
     parser.add_argument("--embedding-dims", type=int, default=256)
+    parser.add_argument("--max-features", type=int, default=30_000)
+    parser.add_argument("--min-df", type=int, default=2)
+    parser.add_argument("--max-df", type=float, default=0.95)
     args = parser.parse_args()
 
     ensure_dirs()
@@ -43,7 +46,14 @@ def main() -> None:
         )
     else:
         prepared = prepare_dataset(args.dataset, max_docs=args.max_docs, max_queries=args.max_queries, reset_store=True)
-    build_index(prepared.doc_ids, prepared.db_path, embedding_dims=args.embedding_dims)
+    build_index(
+        prepared.doc_ids,
+        prepared.db_path,
+        embedding_dims=args.embedding_dims,
+        max_features=args.max_features,
+        min_df=args.min_df,
+        max_df=args.max_df,
+    )
 
     metadata = {
         "dataset_id": prepared.dataset_id,
@@ -52,6 +62,9 @@ def main() -> None:
         "queries": len(prepared.queries),
         "qrels_queries": len(prepared.qrels),
         "db_path": str(prepared.db_path),
+        "max_features": args.max_features,
+        "min_df": args.min_df,
+        "max_df": args.max_df,
     }
     (ARTIFACTS_DIR / "dataset_metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     print(json.dumps(metadata, indent=2))

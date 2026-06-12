@@ -67,7 +67,7 @@ $env:PYTHONPATH=".codex_deps;src"
 Build the final index:
 
 ```powershell
-python scripts\prepare.py --dataset clinicaltrials/2017/trec-pm-2017 --max-docs 0 --max-queries 0 --embedding-dims 128
+python scripts\prepare.py --dataset clinicaltrials/2017/trec-pm-2017 --max-docs 0 --max-queries 0 --embedding-dims 64 --max-features 30000 --min-df 2 --max-df 0.95
 ```
 
 Evaluate:
