@@ -1,7 +1,7 @@
 ir_datasets
 numpy
 scipy
-scikit-learn
+scikit-learn==1.6.1
 matplotlib
 streamlit
 joblib
