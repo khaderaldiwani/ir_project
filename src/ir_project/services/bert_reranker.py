@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import shutil
 
 import numpy as np
 
@@ -27,7 +28,10 @@ class BertReranker:
 
         cache_dir = ARTIFACTS_DIR / "bert_model_cache"
         cache_dir.mkdir(parents=True, exist_ok=True)
-        self.model = SentenceTransformer(self.model_name, cache_folder=str(cache_dir))
+        _materialize_huggingface_cache_links(cache_dir)
+        local_model = _local_cached_model_path(cache_dir)
+        model_source = str(local_model) if local_model else self.model_name
+        self.model = SentenceTransformer(model_source, cache_folder=str(cache_dir))
 
     def rerank(self, query: str, candidates: list[SearchResult], top_k: int) -> list[SearchResult]:
         if not candidates:
@@ -61,3 +65,32 @@ class BertReranker:
                 )
             )
         return results
+
+
+def _materialize_huggingface_cache_links(cache_dir) -> None:
+    """Convert copied Linux symlink placeholders in HF cache into real files on Windows."""
+    for snapshot_dir in cache_dir.glob("models--*/snapshots/*"):
+        if not snapshot_dir.is_dir():
+            continue
+        blobs_dir = snapshot_dir.parents[1] / "blobs"
+        if not blobs_dir.exists():
+            continue
+        for path in snapshot_dir.rglob("*"):
+            if not path.is_file() or path.stat().st_size > 256:
+                continue
+            try:
+                target = path.read_text(encoding="utf-8").strip()
+            except UnicodeDecodeError:
+                continue
+            if "/blobs/" not in target.replace("\\", "/"):
+                continue
+            blob = blobs_dir / target.rsplit("/", 1)[-1]
+            if blob.exists():
+                shutil.copyfile(blob, path)
+
+
+def _local_cached_model_path(cache_dir):
+    for snapshot_dir in cache_dir.glob("models--sentence-transformers--all-MiniLM-L6-v2/snapshots/*"):
+        if (snapshot_dir / "modules.json").exists() and (snapshot_dir / "config.json").exists():
+            return snapshot_dir
+    return None
