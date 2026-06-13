@@ -85,7 +85,7 @@ python scripts\search.py "lung cancer EGFR adult" --method bm25 --top-k 10
 Run UI:
 
 ```powershell
-.\run_app.ps1
+.\run_app.cmd
 ```
 
 Optional BERT reranking:
@@ -101,7 +101,17 @@ BERT reranking does not rebuild `search_index.joblib` or `documents.sqlite`. BM2
 
 The latest results are saved in `artifacts/evaluation_metrics.csv`, and the chart is saved in `reports/figures/evaluation_metrics.png`.
 
-Best current baseline: BM25.
+Latest full ClinicalTrials results:
+
+| Method | MAP | nDCG@10 | Precision@10 | Recall |
+|---|---:|---:|---:|---:|
+| TF-IDF | 0.0230 | 0.1259 | 0.1621 | 0.0523 |
+| BM25 | 0.0823 | 0.2892 | 0.3000 | 0.1284 |
+| Embedding | 0.0005 | 0.0045 | 0.0138 | 0.0023 |
+| Hybrid Parallel | 0.0560 | 0.2148 | 0.2241 | 0.0934 |
+| Hybrid Serial | 0.0761 | 0.2948 | 0.2862 | 0.1168 |
+
+Best current baseline by MAP: BM25.
 
 Additional refined-query evaluation:
 

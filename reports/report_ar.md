@@ -26,7 +26,7 @@
 
 تم التدريب وبناء الفهارس على Google Colab، ثم تم حفظ الملفات الناتجة داخل مجلد `artifacts` ونقلها إلى المشروع المحلي. وقت العرض لا يتم تدريب جديد، بل يقرأ النظام الملفات الجاهزة مثل `search_index.joblib` و `documents.sqlite`.
 
-تم استخدام Dataset كاملة بدون أخذ أول N وثيقة فقط. هذا مهم لأن أخذ جزء من Dataset ضخمة مثل MS MARCO قد لا يكون مقبولاً حسب ملاحظات المعيدة.
+تم استخدام Dataset كاملة بدون أخذ أول N وثيقة فقط. هذا مهم لأن ملاحظات المعيدة أكدت ضرورة اختيار Dataset قابلة للمعالجة كاملة بدلاً من أخذ عينة من Dataset ضخمة.
 
 ## 3. المعالجة المسبقة
 
@@ -82,7 +82,7 @@
 
 ```mermaid
 flowchart LR
-    A["MS MARCO Files"] --> B["Data Service"]
+    A["ClinicalTrials Dataset"] --> B["Data Service"]
     B --> C["SQLite Store"]
     B --> D["Preprocessing"]
     D --> E["Indexing"]
@@ -136,21 +136,31 @@ flowchart LR
 - Precision@10
 - Recall
 
-نتائج التقييم يتم توليدها بعد تدريب Colab على ClinicalTrials وتخزينها في `artifacts/evaluation_metrics.csv`. الجدول التالي يتم تحديثه حسب آخر تدريب:
+نتائج التقييم تم توليدها بعد تدريب Colab على ClinicalTrials وتخزينها في `artifacts/evaluation_metrics.csv`. الجدول التالي يعرض آخر نتائج فعلية بعد التدريب الكامل على 241,006 وثيقة:
 
 | Method | MAP | nDCG@10 | Precision@10 | Recall |
 |---|---:|---:|---:|---:|
-| TF-IDF | يتم توليده | يتم توليده | يتم توليده | يتم توليده |
-| BM25 | يتم توليده | يتم توليده | يتم توليده | يتم توليده |
-| Embedding | يتم توليده | يتم توليده | يتم توليده | يتم توليده |
-| Hybrid Parallel | يتم توليده | يتم توليده | يتم توليده | يتم توليده |
-| Hybrid Serial | يتم توليده | يتم توليده | يتم توليده | يتم توليده |
+| TF-IDF | 0.0230 | 0.1259 | 0.1621 | 0.0523 |
+| BM25 | 0.0823 | 0.2892 | 0.3000 | 0.1284 |
+| Embedding | 0.0005 | 0.0045 | 0.0138 | 0.0023 |
+| Hybrid Parallel | 0.0560 | 0.2148 | 0.2241 | 0.0934 |
+| Hybrid Serial | 0.0761 | 0.2948 | 0.2862 | 0.1168 |
 
-بعد إعادة التدريب على ClinicalTrials يتم اختيار أفضل نموذج حسب النتائج الفعلية. غالباً يكون BM25 أو Hybrid مناسبين لأن الاستعلامات الطبية تعتمد على مصطلحات محددة مثل disease وgene وdemographic.
+حسب النتائج الفعلية، حقق BM25 أفضل MAP وPrecision@10 وRecall، بينما حقق Hybrid Serial أفضل nDCG@10. لذلك نستخدم BM25 وHybrid Serial/Parallel كطرق قوية في العرض، مع إبقاء BERT rerank كخيار دلالي إضافي فوق BM25.
 
-تم أيضاً توليد تقييم إضافي بعد تفعيل Query Refinement في:
+تم أيضاً توليد تقييم إضافي بعد تفعيل Query Refinement في `artifacts/evaluation_metrics_refined.csv`:
 
-- `artifacts/evaluation_metrics_refined.csv`
+| Method | MAP | nDCG@10 | Precision@10 | Recall |
+|---|---:|---:|---:|---:|
+| TF-IDF + Refinement | 0.0250 | 0.1350 | 0.1724 | 0.0555 |
+| BM25 + Refinement | 0.0747 | 0.2742 | 0.3034 | 0.1187 |
+| Embedding + Refinement | 0.0006 | 0.0037 | 0.0103 | 0.0023 |
+| Hybrid Parallel + Refinement | 0.0544 | 0.2177 | 0.2207 | 0.0800 |
+| Hybrid Serial + Refinement | 0.0693 | 0.2786 | 0.2793 | 0.1080 |
+
+كما تم توليد الرسوم البيانية في:
+
+- `reports/figures/evaluation_metrics.png`
 - `reports/figures/evaluation_metrics_refined.png`
 
 بالنسبة إلى RAG، فهو لا يغيّر qrels مباشرة لأنه طبقة إجابة فوق الاسترجاع، لذلك تم تقييم نماذج الاسترجاع الأساسية رقمياً، وتم تقييم RAG عملياً من خلال الواجهة وعرض المصادر.
@@ -205,7 +215,7 @@ flowchart LR
 
 ```powershell
 cd "C:\Users\Lenovo\Desktop\ir dociment\ir_project"
-.\run_app.ps1
+.\run_app.cmd
 ```
 
 ثم نفتح:
@@ -226,9 +236,10 @@ python scripts\evaluate.py --dataset clinicaltrials/2017/trec-pm-2017 --max-quer
 
 تم تجهيز المشروع للرفع على GitHub مع تجاهل الملفات الضخمة مثل:
 
-- `data/raw/msmarco/collection.tsv`
+- `data/raw/`
 - `artifacts/search_index.joblib`
 - `artifacts/documents.sqlite`
+- `artifacts/bert_model_cache`
 - `.codex_deps`
 
 الـ README يشرح طريقة تنزيل Dataset وتوليد الملفات الكبيرة محلياً أو على Colab.

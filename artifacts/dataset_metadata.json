@@ -1,8 +1,11 @@
 {
-  "dataset_id": "local-msmarco-passage",
-  "max_docs": 250000,
-  "actual_docs": 253947,
-  "queries": 43,
-  "qrels_queries": 43,
-  "db_path": "/content/ir_project/artifacts/documents.sqlite"
+  "dataset_id": "clinicaltrials/2017/trec-pm-2017",
+  "max_docs": "all",
+  "actual_docs": 241006,
+  "queries": 30,
+  "qrels_queries": 29,
+  "db_path": "/content/ir_project/artifacts/documents.sqlite",
+  "max_features": 30000,
+  "min_df": 2,
+  "max_df": 0.95
 }
