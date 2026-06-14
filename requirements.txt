@@ -7,3 +7,5 @@ streamlit
 joblib
 sentence-transformers
 pandas
+fastapi
+uvicorn

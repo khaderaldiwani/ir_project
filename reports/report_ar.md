@@ -16,6 +16,8 @@
 - تحتوي على qrels، وهذا ضروري لحساب MAP و nDCG و Precision@10 و Recall.
 - يمكن استخدامها كاملة بدون تجزيء Dataset ضخمة.
 
+تم اعتماد Dataset واحدة بناءً على التوضيح النهائي للمعيدة، لذلك بُنيت جميع النماذج والتقييمات على هذه Dataset الكاملة.
+
 النسخة المحضرة في المشروع تحتوي على:
 
 - عدد الوثائق: 241,006
@@ -66,7 +68,7 @@
 
 ## 5. بنية النظام وفق SOA
 
-تم تقسيم المشروع إلى خدمات Python مستقلة ومنظمة وفق مفهوم SOA. لم يتم استخدام Microservices أو REST API حقيقية لتقليل التعقيد وضمان سرعة العرض، لكن تم تحقيق فصل واضح للمسؤوليات وقابلية تشغيل الخدمات بشكل مستقل من خلال سكربتات Python.
+تم تقسيم المشروع إلى خدمات Python مستقلة ومنظمة وفق مفهوم SOA، مع إضافة REST API باستخدام FastAPI كـ API Gateway. تستخدم واجهة Streamlit والـ API نفس `ServiceContainer` لتحميل قاعدة البيانات والفهرس وخدمات الاسترجاع وRAG مرة واحدة، مما يقلل التكرار ويحافظ على Loose Coupling.
 
 الخدمات الأساسية:
 
@@ -79,6 +81,20 @@
 - Evaluation Service: حساب MAP وnDCG وPrecision@10 وRecall.
 - RAG Service: واجهة سؤال وجواب تعتمد على الوثائق المسترجعة.
 - UI Service: واجهة Streamlit.
+- API Gateway: واجهة REST توفر `/health` و`/search` و`/rag` و`/metrics`.
+
+يمكن تشغيل واختبار الخدمات بشكل مستقل:
+
+```powershell
+.\run_api.cmd
+.\run_tests.cmd
+```
+
+توفر FastAPI توثيق OpenAPI تفاعلياً على:
+
+```text
+http://127.0.0.1:8000/docs
+```
 
 ```mermaid
 flowchart LR
@@ -99,6 +115,9 @@ flowchart LR
     C --> K
     C --> L["UI"]
     I --> L
+    I --> M["FastAPI Gateway"]
+    K --> M
+    C --> M
 ```
 
 ## 6. نماذج الاسترجاع
@@ -112,7 +131,7 @@ flowchart LR
 - Hybrid Serial: استخدام BM25 لاسترجاع المرشحين ثم إعادة ترتيبهم باستخدام embedding.
 - BERT Rerank: استخدام BM25 لجلب أفضل المرشحين بسرعة، ثم استخدام Sentence-BERT لإعادة ترتيب المرشحين دلالياً.
 
-تم استخدام LSA / TruncatedSVD كتمثيل Embedding سريع ومحلي، وتمت إضافة BERT بطريقة reranking حتى لا نحسب BERT embeddings لكل 241,006 وثيقة. هذه الطريقة عملية لأن BM25 يجلب عدداً صغيراً من المرشحين، ثم BERT يعيد ترتيبهم دلالياً. لا نحتاج إعادة تدريب الفهارس لاستخدام BERT، وإنما نحتاج فقط تحميل نموذج `sentence-transformers/all-MiniLM-L6-v2`.
+تم استخدام LSA / TruncatedSVD كـ embedding baseline سريع ومحلي، وتمت إضافة Sentence-BERT بطريقة reranking حتى لا نحسب BERT embeddings لكل 241,006 وثيقة. يجلب BM25 أفضل 50 مرشحاً، ثم يعيد BERT ترتيبهم دلالياً. تم تقييم BERT رسمياً، وكانت نتائجه أفضل بكثير من LSA، لذلك يمثل Sentence-BERT النموذج الدلالي الأساسي بينما بقي LSA للمقارنة العلمية.
 
 ## 7. الميزة الإضافية
 
@@ -122,50 +141,66 @@ flowchart LR
 
 1. يكتب المستخدم سؤالاً في تبويب RAG Chat.
 2. يستخدم النظام Retrieval Service لجلب الوثائق الأكثر صلة.
-3. يتم بناء جواب extractive grounded answer من المقاطع المسترجعة.
+3. تختار Grounded Answer Generator الجمل الأكثر ارتباطاً بكلمات السؤال من الوثائق المسترجعة.
 4. يتم عرض مصادر الإجابة مع `doc_id` وscore.
 
-الميزة قابلة للتجربة بشكل مستقل من تبويب RAG Chat.
+الإجابة Extractive Grounded RAG تعمل محلياً دون API خارجي، وتضيف citations وتحتفظ بقائمة evidence حتى يمكن قياس groundedness.
 
 ## 8. التقييم
 
 تم حساب المقاييس التالية:
 
-- MAP
+- MAP@1000
 - nDCG@10
 - Precision@10
-- Recall
+- Recall@1000
 
-نتائج التقييم تم توليدها بعد تدريب Colab على ClinicalTrials وتخزينها في `artifacts/evaluation_metrics.csv`. الجدول التالي يعرض آخر نتائج فعلية بعد التدريب الكامل على 241,006 وثيقة:
+تم استرجاع أفضل 1000 وثيقة لكل query لحساب MAP وRecall بعمق عملي واضح، بينما بقيت مقاييس الرتب الأولى عند 10. النتائج محفوظة في `artifacts/evaluation_metrics.csv`:
 
-| Method | MAP | nDCG@10 | Precision@10 | Recall |
+| Method | MAP@1000 | nDCG@10 | Precision@10 | Recall@1000 |
 |---|---:|---:|---:|---:|
-| TF-IDF | 0.0230 | 0.1259 | 0.1621 | 0.0523 |
-| BM25 | 0.0823 | 0.2892 | 0.3000 | 0.1284 |
-| Embedding | 0.0005 | 0.0045 | 0.0138 | 0.0023 |
-| Hybrid Parallel | 0.0560 | 0.2148 | 0.2241 | 0.0934 |
-| Hybrid Serial | 0.0761 | 0.2948 | 0.2862 | 0.1168 |
+| TF-IDF | 0.0912 | 0.1259 | 0.1621 | 0.5902 |
+| BM25 | 0.1921 | 0.2892 | 0.3000 | 0.6787 |
+| LSA Embedding | 0.0013 | 0.0045 | 0.0138 | 0.0763 |
+| Hybrid Parallel | 0.1476 | 0.2292 | 0.2345 | 0.6086 |
+| Hybrid Serial | 0.1770 | 0.2948 | 0.2862 | 0.6468 |
 
 حسب النتائج الفعلية، حقق BM25 أفضل MAP وPrecision@10 وRecall، بينما حقق Hybrid Serial أفضل nDCG@10. لذلك نستخدم BM25 وHybrid Serial/Parallel كطرق قوية في العرض، مع إبقاء BERT rerank كخيار دلالي إضافي فوق BM25.
 
 تم أيضاً توليد تقييم إضافي بعد تفعيل Query Refinement في `artifacts/evaluation_metrics_refined.csv`:
 
-| Method | MAP | nDCG@10 | Precision@10 | Recall |
+| Method | MAP@1000 | nDCG@10 | Precision@10 | Recall@1000 |
 |---|---:|---:|---:|---:|
-| TF-IDF + Refinement | 0.0250 | 0.1350 | 0.1724 | 0.0555 |
-| BM25 + Refinement | 0.0747 | 0.2742 | 0.3034 | 0.1187 |
-| Embedding + Refinement | 0.0006 | 0.0037 | 0.0103 | 0.0023 |
-| Hybrid Parallel + Refinement | 0.0544 | 0.2177 | 0.2207 | 0.0800 |
-| Hybrid Serial + Refinement | 0.0693 | 0.2786 | 0.2793 | 0.1080 |
+| TF-IDF + Refinement | 0.0910 | 0.1350 | 0.1724 | 0.5794 |
+| BM25 + Refinement | 0.1766 | 0.2742 | 0.3034 | 0.6494 |
+| LSA + Refinement | 0.0019 | 0.0037 | 0.0103 | 0.1237 |
+| Hybrid Parallel + Refinement | 0.1430 | 0.2324 | 0.2310 | 0.6007 |
+| Hybrid Serial + Refinement | 0.1640 | 0.2786 | 0.2793 | 0.6390 |
 
 كما تم توليد الرسوم البيانية في:
 
 - `reports/figures/evaluation_metrics.png`
 - `reports/figures/evaluation_metrics_refined.png`
 
-بالنسبة إلى RAG، فهو لا يغيّر qrels مباشرة لأنه طبقة إجابة فوق الاسترجاع، لذلك تم تقييم نماذج الاسترجاع الأساسية رقمياً، وتم تقييم RAG عملياً من خلال الواجهة وعرض المصادر.
+أظهر Query Refinement تحسناً محدوداً في TF-IDF وLSA لبعض المقاييس، لكنه خفّض MAP وRecall في BM25 والهجين. السبب أن التوسعة بمرادفات عامة قد تضيف كلمات لا تناسب المصطلحات الطبية الدقيقة. لذلك جعلناها اختيارية من الواجهة بدلاً من فرضها دائماً.
 
-ملاحظة حول BERT: تم إضافته كخيار في الواجهة باسم `bert_rerank`. هذا الخيار مناسب للعرض العملي عند توفر مكتبة `sentence-transformers` ونموذج BERT محلياً. لم يتم إدخاله في جدول التقييم الأساسي لأنه أبطأ ويعمل كمرحلة reranking فوق BM25 وليس فهرساً مستقلاً لكل الوثائق.
+### تقييم Sentence-BERT
+
+| Method | MAP@10 | nDCG@10 | Precision@10 | Recall@10 |
+|---|---:|---:|---:|---:|
+| BERT Rerank | 0.0556 | 0.2474 | 0.2655 | 0.0864 |
+
+تفوق BERT بوضوح على LSA في الرتب العشر الأولى. وهو أبطأ من BM25، لذلك استخدمناه كمرحلة reranking فوق 50 مرشحاً بدلاً من تطبيقه على كامل الوثائق في كل query.
+
+### التقييم قبل وبعد RAG
+
+قبل RAG يعرض النظام الوثائق المرتبة فقط. بعد RAG يضيف إجابة مؤرضة مع evidence وcitations دون تغيير قائمة الاسترجاع الأساسية. لذلك تم تقييم جودة طبقة RAG بالمقاييس التالية:
+
+| Source P@5 | Source Recall@5 | Query Coverage | Citation Coverage | Groundedness |
+|---:|---:|---:|---:|---:|
+| 0.2483 | 0.0604 | 0.4352 | 0.6000 | 1.0000 |
+
+قيمة Groundedness الكاملة تعني أن كل جملة دليل في الإجابة موجودة نصياً في الوثائق الأصلية المسترجعة من SQLite. Citation Coverage تساوي 0.6 لأن الإجابة تعرض أفضل ثلاثة أدلة من أصل خمسة مصادر مسترجعة.
 
 ## 9. لقطات من النظام
 
@@ -181,13 +216,9 @@ flowchart LR
 
 ![RAG Sources](screenshots/rag_sources.png)
 
-### Evaluation Table
-
-![Evaluation Table](screenshots/evaluation_table.png)
-
 ### Evaluation Chart
 
-![Evaluation Chart](screenshots/evaluation_chart.png)
+![Evaluation Chart](figures/evaluation_metrics.png)
 
 ## 10. الواجهة
 
@@ -230,6 +261,8 @@ http://localhost:8501
 $env:PYTHONPATH=".codex_deps;src"
 python scripts\prepare.py --dataset clinicaltrials/2017/trec-pm-2017 --max-docs 0 --max-queries 0 --embedding-dims 64 --max-features 30000 --min-df 2 --max-df 0.95
 python scripts\evaluate.py --dataset clinicaltrials/2017/trec-pm-2017 --max-queries 0
+python scripts\evaluate_bert.py
+python scripts\evaluate_rag.py
 ```
 
 ## 13. GitHub
@@ -243,3 +276,14 @@ python scripts\evaluate.py --dataset clinicaltrials/2017/trec-pm-2017 --max-quer
 - `.codex_deps`
 
 الـ README يشرح طريقة تنزيل Dataset وتوليد الملفات الكبيرة محلياً أو على Colab.
+
+## 14. المصادر
+
+1. IR Datasets documentation: https://ir-datasets.com/
+2. TREC Precision Medicine Track: https://trec.nist.gov/data/precmed.html
+3. scikit-learn TF-IDF documentation: https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.TfidfVectorizer.html
+4. scikit-learn TruncatedSVD documentation: https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.TruncatedSVD.html
+5. Reimers, N. and Gurevych, I. Sentence-BERT: https://arxiv.org/abs/1908.10084
+6. Sentence Transformers documentation: https://www.sbert.net/
+7. FastAPI documentation: https://fastapi.tiangolo.com/
+8. Robertson, S. and Zaragoza, H. The Probabilistic Relevance Framework: BM25 and Beyond. Foundations and Trends in Information Retrieval, 2009.

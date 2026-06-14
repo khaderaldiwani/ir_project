@@ -28,6 +28,8 @@ ClinicalTrials was selected because it is not Antique, contains more than 200K d
 - RAG-style chat interface with grounded source passages
 - Evaluation with MAP, nDCG@10, Precision@10, and Recall
 - Streamlit UI
+- FastAPI REST gateway with OpenAPI documentation
+- Independent service tests
 
 ## Architecture
 
@@ -88,6 +90,20 @@ Run UI:
 .\run_app.cmd
 ```
 
+Run REST API:
+
+```powershell
+.\run_api.cmd
+```
+
+Open API documentation at `http://127.0.0.1:8000/docs`.
+
+Run tests:
+
+```powershell
+.\run_tests.cmd
+```
+
 Optional BERT reranking:
 
 ```powershell
@@ -103,20 +119,25 @@ The latest results are saved in `artifacts/evaluation_metrics.csv`, and the char
 
 Latest full ClinicalTrials results:
 
-| Method | MAP | nDCG@10 | Precision@10 | Recall |
+| Method | MAP@1000 | nDCG@10 | Precision@10 | Recall@1000 |
 |---|---:|---:|---:|---:|
-| TF-IDF | 0.0230 | 0.1259 | 0.1621 | 0.0523 |
-| BM25 | 0.0823 | 0.2892 | 0.3000 | 0.1284 |
-| Embedding | 0.0005 | 0.0045 | 0.0138 | 0.0023 |
-| Hybrid Parallel | 0.0560 | 0.2148 | 0.2241 | 0.0934 |
-| Hybrid Serial | 0.0761 | 0.2948 | 0.2862 | 0.1168 |
+| TF-IDF | 0.0912 | 0.1259 | 0.1621 | 0.5902 |
+| BM25 | 0.1921 | 0.2892 | 0.3000 | 0.6787 |
+| LSA Embedding | 0.0013 | 0.0045 | 0.0138 | 0.0763 |
+| Hybrid Parallel | 0.1476 | 0.2292 | 0.2345 | 0.6086 |
+| Hybrid Serial | 0.1770 | 0.2948 | 0.2862 | 0.6468 |
 
-Best current baseline by MAP: BM25.
+Best current baseline by MAP@1000: BM25.
 
 Additional refined-query evaluation:
 
 - `artifacts/evaluation_metrics_refined.csv`
 - `reports/figures/evaluation_metrics_refined.png`
+
+BERT and RAG evaluation:
+
+- `artifacts/evaluation_metrics_bert.csv`
+- `artifacts/rag_evaluation_metrics.csv`
 
 ## Team
 

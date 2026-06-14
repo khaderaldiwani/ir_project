@@ -17,8 +17,15 @@ sys.path.insert(0, str(ROOT / "src"))
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
-from ir_project.config import ARTIFACTS_DIR, DEFAULT_DATASET_ID, DEFAULT_MAX_QUERIES, ensure_dirs
-from ir_project.services.data_service import prepare_dataset, prepare_local_msmarco
+from ir_project.config import (
+    ARTIFACTS_DIR,
+    DEFAULT_DATASET_ID,
+    DEFAULT_MAX_QUERIES,
+    ensure_dirs,
+    resolve_artifact_path,
+)
+from ir_project.services.data_service import load_evaluation_data, prepare_local_msmarco
+from ir_project.services.database import DocumentStore
 from ir_project.services.evaluation_service import evaluate, save_metrics_chart
 from ir_project.services.indexing_service import load_index
 from ir_project.services.retrieval_service import RetrievalService
@@ -33,6 +40,7 @@ def main() -> None:
     parser.add_argument("--qrels-path", default="data/raw/msmarco/qrels.txt")
     parser.add_argument("--max-queries", type=int, default=DEFAULT_MAX_QUERIES, help="0 means use all queries.")
     parser.add_argument("--refine", action="store_true", help="Evaluate after query refinement.")
+    parser.add_argument("--depth", type=int, default=1000, help="Retrieval depth for MAP and Recall.")
     args = parser.parse_args()
 
     ensure_dirs()
@@ -50,17 +58,40 @@ def main() -> None:
             max_docs=max_docs,
             max_queries=args.max_queries,
         )
+        queries, qrels = prepared.queries, prepared.qrels
     else:
-        prepared = prepare_dataset(args.dataset, max_docs=max_docs, max_queries=args.max_queries)
-    retriever = RetrievalService(load_index())
-    rows = evaluate(retriever, prepared.queries, prepared.qrels, refine=args.refine)
+        queries, qrels = load_evaluation_data(args.dataset, max_queries=args.max_queries)
+    store = DocumentStore(resolve_artifact_path(metadata["db_path"], "documents.sqlite"))
+    retriever = RetrievalService(load_index(), store)
+    rows = evaluate(
+        retriever,
+        queries,
+        qrels,
+        retrieval_depth=args.depth,
+        refine=args.refine,
+    )
 
     csv_path = ARTIFACTS_DIR / ("evaluation_metrics_refined.csv" if args.refine else "evaluation_metrics.csv")
     with csv_path.open("w", newline="", encoding="utf-8") as file:
-        writer = csv.DictWriter(file, fieldnames=["method", "map", "ndcg", "precision_at_10", "recall"])
+        fieldnames = [
+            "method",
+            f"map_at_{args.depth}",
+            "ndcg_at_10",
+            "precision_at_10",
+            f"recall_at_{args.depth}",
+        ]
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         for row in rows:
-            writer.writerow(row.__dict__)
+            writer.writerow(
+                {
+                    "method": row.method,
+                    f"map_at_{args.depth}": row.map_at_depth,
+                    "ndcg_at_10": row.ndcg_at_10,
+                    "precision_at_10": row.precision_at_10,
+                    f"recall_at_{args.depth}": row.recall_at_depth,
+                }
+            )
             print(row)
     chart_path = save_metrics_chart(
         rows,

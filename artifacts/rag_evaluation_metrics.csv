@@ -1,0 +1,2 @@
+source_precision_at_5,source_recall_at_5,answer_query_coverage,citation_coverage,groundedness
+0.2482758620689655,0.06036515827920557,0.4352204309100861,0.6,1.0

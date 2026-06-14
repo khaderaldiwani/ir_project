@@ -1,4 +1,3 @@
-import json
 import os
 import sys
 from pathlib import Path
@@ -14,11 +13,8 @@ sys.path.insert(0, str(ROOT / "src"))
 import streamlit as st
 import pandas as pd
 
-from ir_project.config import ARTIFACTS_DIR, resolve_artifact_path
-from ir_project.services.database import DocumentStore
-from ir_project.services.indexing_service import load_index
-from ir_project.services.rag_service import RagService
-from ir_project.services.retrieval_service import RetrievalService
+from ir_project.config import ARTIFACTS_DIR
+from ir_project.services.service_container import load_service_container
 
 
 st.set_page_config(page_title="IR Search System", layout="wide")
@@ -26,15 +22,11 @@ st.set_page_config(page_title="IR Search System", layout="wide")
 
 @st.cache_resource
 def load_services():
-    metadata_path = ARTIFACTS_DIR / "dataset_metadata.json"
-    if not metadata_path.exists():
+    try:
+        container = load_service_container()
+    except RuntimeError:
         return None, None, None
-    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-    index = load_index()
-    store = DocumentStore(resolve_artifact_path(metadata["db_path"], "documents.sqlite"))
-    retriever = RetrievalService(index, store)
-    rag = RagService(retriever, store)
-    return metadata, retriever, rag
+    return container.metadata, container.retriever, container.rag
 
 
 metadata, retriever, rag = load_services()
@@ -42,7 +34,10 @@ metadata, retriever, rag = load_services()
 st.title("Information Retrieval System")
 
 if metadata is None:
-    st.error("Artifacts are not ready. Run: python scripts/prepare.py --max-docs 250000 --max-queries 50")
+    st.error(
+        "Artifacts are not ready. Run scripts/prepare.py with "
+        "--dataset clinicaltrials/2017/trec-pm-2017 --max-docs 0 --max-queries 0"
+    )
     st.stop()
 
 with st.sidebar:
@@ -95,11 +90,16 @@ with rag_tab:
             st.error(str(exc))
 
 with metrics_tab:
-    metrics_path = ARTIFACTS_DIR / "evaluation_metrics.csv"
     chart_path = Path("reports") / "figures" / "evaluation_metrics.png"
-    if metrics_path.exists():
-        st.dataframe(pd.read_csv(metrics_path), use_container_width=True)
-    else:
-        st.info("Run python scripts/evaluate.py to generate metrics.")
+    metric_files = [
+        ("Base retrieval evaluation", ARTIFACTS_DIR / "evaluation_metrics.csv"),
+        ("Query refinement evaluation", ARTIFACTS_DIR / "evaluation_metrics_refined.csv"),
+        ("BERT reranking evaluation", ARTIFACTS_DIR / "evaluation_metrics_bert.csv"),
+        ("RAG quality evaluation", ARTIFACTS_DIR / "rag_evaluation_metrics.csv"),
+    ]
+    for title, metrics_path in metric_files:
+        if metrics_path.exists():
+            st.subheader(title)
+            st.dataframe(pd.read_csv(metrics_path), width="stretch")
     if chart_path.exists():
         st.image(str(chart_path))

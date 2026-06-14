@@ -23,6 +23,7 @@ class RetrievalService:
         self.store = store
         self.doc_pos = {doc_id: pos for pos, doc_id in enumerate(index.doc_ids)}
         self.refiner = QueryRefinementService(index.processor)
+        self._bert_reranker = None
 
     def _clean_query(self, query: str) -> str:
         return self.index.processor.normalize(query)
@@ -69,8 +70,9 @@ class RetrievalService:
         from ir_project.services.bert_reranker import BertReranker
 
         candidates = self.bm25_search(query, top_k=candidate_k, k1=k1, b=b)
-        reranker = BertReranker(self.store)
-        return reranker.rerank(query, candidates, top_k=top_k)
+        if self._bert_reranker is None:
+            self._bert_reranker = BertReranker(self.store)
+        return self._bert_reranker.rerank(query, candidates, top_k=top_k)
 
     def search(
         self,

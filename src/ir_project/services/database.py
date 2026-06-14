@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from typing import Iterable
 
@@ -23,18 +24,20 @@ class DocumentStore:
         return conn
 
     def reset(self) -> None:
-        with self.connect() as conn:
-            conn.execute("DELETE FROM documents")
+        with closing(self.connect()) as conn:
+            with conn:
+                conn.execute("DELETE FROM documents")
 
     def upsert_many(self, rows: Iterable[tuple[str, str, str]]) -> None:
-        with self.connect() as conn:
-            conn.executemany(
-                "INSERT OR REPLACE INTO documents(doc_id, title, body) VALUES (?, ?, ?)",
-                rows,
-            )
+        with closing(self.connect()) as conn:
+            with conn:
+                conn.executemany(
+                    "INSERT OR REPLACE INTO documents(doc_id, title, body) VALUES (?, ?, ?)",
+                    rows,
+                )
 
     def get(self, doc_id: str) -> dict[str, str] | None:
-        with self.connect() as conn:
+        with closing(self.connect()) as conn:
             row = conn.execute(
                 "SELECT doc_id, title, body FROM documents WHERE doc_id = ?", (doc_id,)
             ).fetchone()
@@ -46,7 +49,7 @@ class DocumentStore:
         if not doc_ids:
             return {}
         result: dict[str, dict[str, str]] = {}
-        with self.connect() as conn:
+        with closing(self.connect()) as conn:
             for start in range(0, len(doc_ids), 900):
                 batch = doc_ids[start : start + 900]
                 placeholders = ",".join("?" for _ in batch)
@@ -60,5 +63,5 @@ class DocumentStore:
         return result
 
     def count(self) -> int:
-        with self.connect() as conn:
+        with closing(self.connect()) as conn:
             return int(conn.execute("SELECT COUNT(*) FROM documents").fetchone()[0])

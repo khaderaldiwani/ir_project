@@ -18,6 +18,23 @@ class PreparedDataset:
     db_path: Path
 
 
+def load_evaluation_data(
+    dataset_id: str = DEFAULT_DATASET_ID,
+    max_queries: int = DEFAULT_MAX_QUERIES,
+) -> tuple[dict[str, str], dict[str, dict[str, int]]]:
+    dataset = ir_datasets.load(dataset_id)
+    all_queries = dict(_query_text(query) for query in dataset.queries_iter())
+    selected_ids = list(all_queries) if max_queries <= 0 else list(all_queries)[:max_queries]
+    queries = {query_id: all_queries[query_id] for query_id in selected_ids}
+
+    qrels: dict[str, dict[str, int]] = defaultdict(dict)
+    for qrel in dataset.qrels_iter():
+        query_id = str(qrel.query_id)
+        if query_id in queries:
+            qrels[query_id][str(qrel.doc_id)] = int(getattr(qrel, "relevance", 0))
+    return queries, dict(qrels)
+
+
 def _doc_text(doc) -> tuple[str, str, str]:
     doc_id = str(getattr(doc, "doc_id"))
     title = getattr(doc, "title", "") or ""
@@ -69,21 +86,10 @@ def prepare_dataset(
     if reset_store:
         store.reset()
 
-    queries = dict(_query_text(query) for query in dataset.queries_iter())
-    selected_query_ids = list(queries) if max_queries <= 0 else list(queries)[:max_queries]
-    queries = {qid: queries[qid] for qid in selected_query_ids}
-
-    qrels: dict[str, dict[str, int]] = defaultdict(dict)
+    queries, qrels = load_evaluation_data(dataset_id, max_queries)
     relevant_doc_ids: set[str] = set()
-    for qrel in dataset.qrels_iter():
-        query_id = str(qrel.query_id)
-        if query_id not in queries:
-            continue
-        relevance = int(getattr(qrel, "relevance", 0))
-        doc_id = str(qrel.doc_id)
-        qrels[query_id][doc_id] = relevance
-        if relevance > 0:
-            relevant_doc_ids.add(doc_id)
+    for relevant in qrels.values():
+        relevant_doc_ids.update(doc_id for doc_id, relevance in relevant.items() if relevance > 0)
 
     doc_rows: list[tuple[str, str, str]] = []
     doc_ids: list[str] = []
@@ -121,7 +127,7 @@ def prepare_dataset(
         dataset_id=dataset_id,
         doc_ids=doc_ids,
         queries=queries,
-        qrels=dict(qrels),
+        qrels=qrels,
         db_path=db_path,
     )
 

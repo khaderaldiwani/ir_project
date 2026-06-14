@@ -1,47 +1,65 @@
 # شرح استخدام Colab للمشروع
 
-استخدام Colab هنا ليس للعرض النهائي، بل للتجريب والتدريب. هذا بالضبط متوافق مع جواب الدكتورة: النوتبوك للتدريب، وبعدها نحفظ الخرج والموديلات بملفات، ثم النسخة النهائية تكون Python scripts.
+يستخدم Colab للتدريب وبناء الفهارس والتقييم فقط. بعد انتهاء التدريب نحفظ `artifacts` و`reports`، ثم تعمل نسخة العرض المحلية من الملفات الجاهزة دون إعادة التدريب.
 
-## ماذا تقولين للدكتورة؟
+## Dataset النهائية
 
-قولي:
+- `clinicaltrials/2017/trec-pm-2017`
+- عدد الوثائق: `241,006`
+- تم استخدام Dataset كاملة.
+- تحتوي على queries وqrels للتقييم الرسمي.
 
-"اشتغلنا أولاً على Colab لتجربة تحميل Dataset وبناء الفهارس والتقييم. بعد ما تأكدنا من النتائج، حولنا الشغل إلى Python scripts منظمة وفق SOA، وحفظنا الفهارس والـ SQLite ونتائج التقييم حتى المشروع يشتغل محلياً بسرعة بدون تدريب أثناء المقابلة."
-
-## لماذا لا نعرض من Colab؟
-
-- لأنه يحتاج إنترنت.
-- قد يطلب تسجيل دخول.
-- قد يقطع runtime.
-- SOA تكون أوضح في ملفات Python.
-- الدكتورة قالت إن Colab هدفه التدريب فقط.
-
-## كيف تجربين على Colab؟
-
-1. افتحي Google Colab.
-2. ارفعي ملف:
-   `notebooks/IR_Project_Colab_Workflow.ipynb`
-3. ارفعي المشروع كـ zip أو استخدمي GitHub إذا رفعناه لاحقاً.
-4. شغلي الخلايا بالترتيب.
-5. للتجريب السريع استخدمي:
+## التدريب الكامل
 
 ```bash
-PYTHONPATH=src python scripts/prepare.py --local-msmarco --max-docs 50000 --max-queries 20 --embedding-dims 64
+PYTHONPATH=src python scripts/prepare.py \
+  --dataset clinicaltrials/2017/trec-pm-2017 \
+  --max-docs 0 \
+  --max-queries 0 \
+  --embedding-dims 64 \
+  --max-features 30000 \
+  --min-df 2 \
+  --max-df 0.95
 ```
 
-6. للنسخة الأقرب للنهائية:
+## التقييم
 
 ```bash
-PYTHONPATH=src python scripts/prepare.py --local-msmarco --max-docs 250000 --max-queries 43 --embedding-dims 128
+PYTHONPATH=src python scripts/evaluate.py \
+  --dataset clinicaltrials/2017/trec-pm-2017 \
+  --max-queries 0 \
+  --depth 1000
+
+PYTHONPATH=src python scripts/evaluate.py \
+  --dataset clinicaltrials/2017/trec-pm-2017 \
+  --max-queries 0 \
+  --depth 1000 \
+  --refine
+
+PYTHONPATH=src python scripts/evaluate_bert.py
+PYTHONPATH=src python scripts/evaluate_rag.py
 ```
 
-## ماذا يجب أن تفهمي؟
+## العرض المحلي
 
-- Dataset هي MS MARCO Passage.
-- qrels تعني الأحكام الصحيحة التي نستخدمها لحساب جودة النتائج.
-- TF-IDF يعتمد على تكرار الكلمات.
-- BM25 نموذج احتمالي متقدم وغالباً أقوى في البحث النصي.
-- Embedding عندنا مبني باستخدام LSA حتى يكون سريعاً ومحلياً.
-- Hybrid Parallel يدمج scores من عدة نماذج.
-- Hybrid Serial يستخدم نموذج أول لجلب candidates ثم نموذج آخر لإعادة الترتيب.
-- RAG Chat يسترجع وثائق ثم يبني جواباً مستنداً إلى هذه الوثائق.
+بعد تنزيل `artifacts` و`reports` إلى المشروع:
+
+```powershell
+.\run_app.cmd
+```
+
+ولتشغيل REST API:
+
+```powershell
+.\run_api.cmd
+```
+
+## نقاط يجب فهمها
+
+- raw text محفوظ في SQLite ويُقرأ حسب `doc_id` وقت query.
+- TF-IDF وBM25 مبنيان على النص المنظف لكامل Dataset.
+- LSA هو embedding baseline خفيف.
+- Sentence-BERT يعيد ترتيب أفضل مرشحي BM25 دلالياً.
+- Hybrid Parallel يستخدم score fusion.
+- Hybrid Serial يستخدم BM25 ثم embedding reranking.
+- RAG يبني إجابة مؤرضة مع evidence وcitations من الوثائق الأصلية.
