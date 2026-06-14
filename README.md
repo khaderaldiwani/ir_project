@@ -139,6 +139,13 @@ BERT and RAG evaluation:
 - `artifacts/evaluation_metrics_bert.csv`
 - `artifacts/rag_evaluation_metrics.csv`
 
+## Final Arabic Report
+
+- `reports/final/تقرير_مشروع_استرجاع_المعلومات_النهائي.pdf`
+- `reports/final/تقرير_مشروع_استرجاع_المعلومات_النهائي.docx`
+
+The report includes the dataset description, implementation stages, SOA architecture, service responsibilities, evaluation results, team task allocation, executable commands, screenshots, GitHub link, and references.
+
 ## Team
 
 - الخضر الديواني
