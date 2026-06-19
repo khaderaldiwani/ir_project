@@ -72,7 +72,13 @@ with search_tab:
                 doc = docs.get(result.doc_id, {})
                 st.markdown(f"#### {result.rank}. `{result.doc_id}`")
                 st.caption(f"{result.method} score: {result.score:.4f}")
-                st.write(" ".join(doc.get("body", "").split())[:1500])
+                st.text_area(
+                    "Original document",
+                    value=doc.get("body", ""),
+                    height=320,
+                    disabled=True,
+                    key=f"search-document-{result.rank}-{result.doc_id}",
+                )
         except RuntimeError as exc:
             st.error(str(exc))
 

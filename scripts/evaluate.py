@@ -61,6 +61,13 @@ def main() -> None:
         queries, qrels = prepared.queries, prepared.qrels
     else:
         queries, qrels = load_evaluation_data(args.dataset, max_queries=args.max_queries)
+
+    evaluation_query_ids = [query_id for query_id in queries if qrels.get(query_id)]
+    print(f"Dataset queries loaded: {len(queries)}")
+    print(f"Unique query IDs in qrels: {len(qrels)}")
+    print(f"Queries used for evaluation: {len(evaluation_query_ids)}")
+    print("Evaluation query IDs: " + ",".join(evaluation_query_ids))
+
     store = DocumentStore(resolve_artifact_path(metadata["db_path"], "documents.sqlite"))
     retriever = RetrievalService(load_index(), store)
     rows = evaluate(
